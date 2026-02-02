@@ -88,14 +88,35 @@ func (r *ReflectCall) asyncCallWithCallback() {
 		panic(ErrNotSetCallback)
 	}
 	funcFieldsNum := typeFuncName.NumIn()
+	log.ZDebug(ctx, "asyncCallWithCallback", "operationID", r.callback.GetOperationID(),
+		"funcFieldsNum", funcFieldsNum,
+		"argumentsLen", len(r.arguments),
+		"hasCallback", hasCallback)
 	if funcFieldsNum-len(r.arguments) > 1 {
 		r.arguments = append(r.arguments, js.Value{})
+		log.ZDebug(ctx, "asyncCallWithCallback appended empty arg", "operationID", r.callback.GetOperationID(),
+			"newArgumentsLen", len(r.arguments))
 	}
 	for i := 0; i < len(r.arguments); i++ {
 		if hasCallback {
 			temp = i + 1
 		} else {
 			temp = i
+		}
+		log.ZDebug(ctx, "asyncCallWithCallback processing arg", "operationID", r.callback.GetOperationID(),
+			"argIndex", i,
+			"paramIndex", temp,
+			"funcFieldsNum", funcFieldsNum,
+			"argumentsLen", len(r.arguments))
+		if temp >= funcFieldsNum {
+			log.ZError(ctx, "asyncCallWithCallback index out of range", nil,
+				"operationID", r.callback.GetOperationID(),
+				"argIndex", i,
+				"paramIndex", temp,
+				"funcFieldsNum", funcFieldsNum,
+				"argumentsLen", len(r.arguments),
+				"hasCallback", hasCallback)
+			panic("index out of range: trying to access parameter index " + utils.IntToString(temp) + " but function has only " + utils.IntToString(funcFieldsNum) + " parameters")
 		}
 		//log.NewDebug(r.callback.GetOperationID(), "type is ", typeFuncName.In(temp).Kind(), r.arguments[i].IsNaN())
 		switch typeFuncName.In(temp).Kind() {
@@ -152,11 +173,26 @@ func (r *ReflectCall) asyncCallWithOutCallback() {
 	if r.callback == nil {
 		r.callback = NewBaseCallback(utils.FirstLower(utils.GetSelfFuncName()), nil)
 	}
-	log.ZWarn(ctx, "asyncCall", nil, "asyncCallWithOutCallback", len(r.arguments))
+	funcFieldsNum := typeFuncName.NumIn()
+	log.ZWarn(ctx, "asyncCallWithOutCallback", nil, "operationID", r.callback.GetOperationID(),
+		"funcFieldsNum", funcFieldsNum,
+		"argumentsLen", len(r.arguments))
 
 	r.callback.SetOperationID(r.arguments[0].String())
 	//strings.SplitAfter()
 	for i := 0; i < len(r.arguments); i++ {
+		log.ZDebug(ctx, "asyncCallWithOutCallback processing arg", "operationID", r.callback.GetOperationID(),
+			"argIndex", i,
+			"funcFieldsNum", funcFieldsNum,
+			"argumentsLen", len(r.arguments))
+		if i >= funcFieldsNum {
+			log.ZError(ctx, "asyncCallWithOutCallback index out of range", nil,
+				"operationID", r.callback.GetOperationID(),
+				"argIndex", i,
+				"funcFieldsNum", funcFieldsNum,
+				"argumentsLen", len(r.arguments))
+			panic("index out of range: trying to access parameter index " + utils.IntToString(i) + " but function has only " + utils.IntToString(funcFieldsNum) + " parameters")
+		}
 		//log.NewDebug(r.callback.GetOperationID(), "type is ", typeFuncName.In(temp).Kind(), r.arguments[i].IsNaN())
 		switch typeFuncName.In(i).Kind() {
 		case reflect.String:
@@ -213,6 +249,7 @@ func (r *ReflectCall) SyncCall() (result []interface{}) {
 			}
 		}
 	}()
+	ctx := context.Background()
 	var funcName reflect.Value
 	var typeFuncName reflect.Type
 	var hasCallback bool
@@ -229,11 +266,31 @@ func (r *ReflectCall) SyncCall() (result []interface{}) {
 		r.callback.SetOperationID(r.arguments[0].String())
 		values = append(values, reflect.ValueOf(r.callback))
 	}
+	funcFieldsNum := typeFuncName.NumIn()
+	log.ZDebug(ctx, "SyncCall", "operationID", r.callback.GetOperationID(),
+		"funcFieldsNum", funcFieldsNum,
+		"argumentsLen", len(r.arguments),
+		"hasCallback", hasCallback)
 	for i := 0; i < len(r.arguments); i++ {
 		if hasCallback {
 			temp = i + 1
 		} else {
 			temp = i
+		}
+		log.ZDebug(ctx, "SyncCall processing arg", "operationID", r.callback.GetOperationID(),
+			"argIndex", i,
+			"paramIndex", temp,
+			"funcFieldsNum", funcFieldsNum,
+			"argumentsLen", len(r.arguments))
+		if temp >= funcFieldsNum {
+			log.ZError(ctx, "SyncCall index out of range", nil,
+				"operationID", r.callback.GetOperationID(),
+				"argIndex", i,
+				"paramIndex", temp,
+				"funcFieldsNum", funcFieldsNum,
+				"argumentsLen", len(r.arguments),
+				"hasCallback", hasCallback)
+			panic("index out of range: trying to access parameter index " + utils.IntToString(temp) + " but function has only " + utils.IntToString(funcFieldsNum) + " parameters")
 		}
 		//log.NewDebug(r.callback.GetOperationID(), "type is ", typeFuncName.In(temp).Kind(), r.arguments[i].IsNaN())
 		switch typeFuncName.In(temp).Kind() {
@@ -276,17 +333,21 @@ func (r *ReflectCall) SyncCall() (result []interface{}) {
 func (r *ReflectCall) ErrHandle(recover interface{}) []string {
 	ctx := context.Background()
 	var temp string
+	var operationID string
+	if r.callback != nil {
+		operationID = r.callback.GetOperationID()
+	}
 	switch x := recover.(type) {
 	case string:
-		log.ZError(ctx, "STRINGERR", nil, "r", x)
+		log.ZError(ctx, "STRINGERR", nil, "operationID", operationID, "r", x)
 		temp = errs.WrapMsg(errors.New(x), "").Error()
 	case error:
 		//buf := make([]byte, 1<<20)
 		//runtime.Stack(buf, true)
-		log.ZError(ctx, "ERR", x, "r", x.Error())
+		log.ZError(ctx, "ERR", x, "operationID", operationID, "r", x.Error())
 		temp = x.Error()
 	default:
-		log.ZError(ctx, "unknown panic", nil, "r", x)
+		log.ZError(ctx, "unknown panic", nil, "operationID", operationID, "r", x)
 		temp = errs.WrapMsg(errors.New("unknown panic"), "").Error()
 	}
 	if r.callback != nil {
