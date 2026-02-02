@@ -171,6 +171,14 @@ build-multiple:
 build-wasm:
 	GOOS=js GOARCH=wasm go build -trimpath -ldflags "-s -w" -o ${BIN_DIR}/openIM.wasm wasm/cmd/main.go
 
+.PHONY: build-wasm-tinygo
+build-wasm-tinygo:
+	@echo "===========> Building WASM with TinyGo"
+	@command -v tinygo >/dev/null 2>&1 || { echo "TinyGo not installed. Please install it first."; exit 1; }
+	tinygo build -target=wasm -no-debug -opt=2 -gc=leaking -scheduler=none -o ${BIN_DIR}/openIM.wasm wasm/cmd/main.go
+	@echo "===========> TinyGo WASM build complete"
+	@ls -lh ${BIN_DIR}/openIM.wasm
+
 ## install: Install the binary to the BIN_DIR
 .PHONY: install
 install: build
