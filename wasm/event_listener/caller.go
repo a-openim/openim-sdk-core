@@ -93,7 +93,7 @@ func (r *ReflectCall) asyncCallWithCallback() {
 	}
 	for i := 0; i < len(r.arguments); i++ {
 		if hasCallback {
-			temp++
+			temp = i + 1
 		} else {
 			temp = i
 		}
@@ -231,7 +231,7 @@ func (r *ReflectCall) SyncCall() (result []interface{}) {
 	}
 	for i := 0; i < len(r.arguments); i++ {
 		if hasCallback {
-			temp++
+			temp = i + 1
 		} else {
 			temp = i
 		}
